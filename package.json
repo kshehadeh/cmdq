@@ -1,0 +1,38 @@
+{
+  "name": "cmdq",
+  "version": "0.0.1",
+  "description": "A tool for chaining shell commands",
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/bundle.esm.js",
+      "require": "./dist/bundle.cjs.js"
+    }
+  },
+  "types": "./dist/types",
+  "scripts": {
+    "test": "jest",
+    "build": "rollup -c",
+    "build:watch": "rollup -c -w"
+  },
+  "keywords": [
+    "shell"
+  ],
+  "author": "Karim Shehadeh",
+  "license": "ISC",
+  "devDependencies": {
+    "@jest/globals": "^29.7.0",
+    "@rollup/plugin-commonjs": "^26.0.1",
+    "@rollup/plugin-node-resolve": "^15.2.3",
+    "@rollup/plugin-typescript": "^11.1.6",
+    "@types/bun": "latest",
+    "@types/jest": "^29.5.12",
+    "bun": "^1.1.24",
+    "jest": "^29.7.0",
+    "rollup": "^4.21.0",
+    "ts-jest": "^29.2.4",
+    "tslib": "^2.6.3",
+    "typescript": "^5.5.4"
+  },
+  "module": "index.ts"
+}
