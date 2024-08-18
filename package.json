@@ -18,6 +18,10 @@
   "keywords": [
     "shell"
   ],
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "author": "Karim Shehadeh",
   "license": "ISC",
   "devDependencies": {
@@ -34,5 +38,8 @@
     "tslib": "^2.6.3",
     "typescript": "^5.5.4"
   },
-  "module": "index.ts"
+  "module": "index.ts",
+  "dependencies": {
+    "getopts": "^2.3.0"
+  }
 }

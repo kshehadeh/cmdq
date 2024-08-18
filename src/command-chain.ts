@@ -1,114 +1,47 @@
 import { spawnSync } from 'child_process'
 import { isNativeError } from 'util/types'
 import fs from 'fs'
-
-const SHOW_COMMAND_LENGTH = 20
-
-export function randomString() {
-    return Math.random().toString(36).substring(7)
-}
-
-export interface CommandChainResult {
-    id: string
-    command: string
-    out: string
-    err: string
-    stat: number
-    result: {
-        success: boolean
-        message: string
-    }
-}
-
-export interface CommandChainConfig {
-    workingDirectory: string,
-    enableTrace?: string    
-} 
-
-const isConfig = (configOrCwd: CommandChainConfig | string): configOrCwd is CommandChainConfig => {
-    return (configOrCwd as CommandChainConfig).workingDirectory !== undefined
-}
-
-export interface CommandInput {
-    command: string
-    id: string
-    continueOnError: boolean
-    if?: (result: CommandChainResult | null) => boolean
-    success?: (result: CommandChainResult) => { success: boolean; message: string }
-}
-
-const commandAbbreviator = (cmd: string) => {
-    return cmd.length > SHOW_COMMAND_LENGTH ? cmd.slice(0, SHOW_COMMAND_LENGTH) + '...' : cmd
-}
-
-export type CmdOptions = Partial<Omit<CommandInput, 'command'>>
-
-/**
- * Checks if a command execution was successful.
- * @param result The result of a command execution.
- * @returns True if the command was successful, false otherwise.
- */
-function checkSuccess(result: CommandChainResult): { success: boolean; message: string } {
-    return {
-        success: !(result.stat !== 0 && result.err),
-        message: result.err,
-    }
-}
-
-/**
- * Creates a command input object from a reduced set of options. This is
- * a convenience function to build a command input object when only certain
- * options need to be specified.
- * @param cmd
- * @param options
- * @returns
- */
-export function o(cmd: string, options?: CmdOptions): CommandInput {
-    const opts = {
-        id: randomString(),
-        continueOnError: false,
-        ...options,
-    }
-
-    return {
-        command: cmd,
-        ...opts,
-    }
-}
+import { CommandInput, CommandChainResult, CommandChainConfig, PipeType, CmdOptions } from './types'
+import { isConfig, randomString, commandAbbreviator, checkSuccess } from './util'
+import { getGlobalConfig } from './context'
 
 /**
  * Represents a chain of commands to be executed.
  */
 export class CommandChain {
     commands: CommandInput[] = []
-    workingDirectory: string
+    config: CommandChainConfig
     results: CommandChainResult[] = []
     _cannedResults: Record<string, CommandChainResult> = {}
-    dryRun: boolean = false
-    dryRunResultsFile: string | null = ''
-    continueOnError: boolean = false
 
     /**
      * Creates a new instance of CommandChain.
      * @param workingDirectory The working directory for the commands.
      */
-    constructor(configOrCwd: CommandChainConfig | string) {
-        this.workingDirectory = isConfig(configOrCwd) ? configOrCwd.workingDirectory : configOrCwd
-        this.enableTrace = isConfig(configOrCwd) ? configOrCwd.enableTrace === 'true' : false
-        this.dryRun = isConfig(configOrCwd) ? configOrCwd.enableTrace === 'true' : false
-        
-        this.dryRunResultsFile = process.env.RECORDER_PATH || null
+    constructor(configOrCwd?: CommandChainConfig | string) {
+        if (!configOrCwd) {
+            this.config = getGlobalConfig()
+        } else if (isConfig(configOrCwd)) {
+            this.config = configOrCwd
+        } else {
+            this.config = {
+                ...getGlobalConfig(),
+                workingDirectory: configOrCwd,
+            }
+        }
 
-        if (this.dryRun && this.dryRunResultsFile) {
-            if (fs.existsSync(this.dryRunResultsFile)) {
-                const raw = fs.readFileSync(this.dryRunResultsFile, 'utf-8')
+        if (this.config.dryRun && this.config.dryRunResultsFile) {
+            if (fs.existsSync(this.config.dryRunResultsFile)) {
+                const raw = fs.readFileSync(this.config.dryRunResultsFile, 'utf-8')
                 this._cannedResults = JSON.parse(raw)                
             }
         }
     }
 
     trace(message?: any, ...optionalParams: any[]) {
-        console.log(message, ...optionalParams)
+        if (this.config.enableTrace) {
+            console.log(message, ...optionalParams)
+        }
     }
     
     /**
@@ -139,16 +72,20 @@ export class CommandChain {
      * @param command The command to add.
      * @returns The updated CommandChain instance.
      */
-    add(command: string | CommandInput): this {
+    add(command: string | CmdOptions): this {
         let input: CommandInput
         if (typeof command === 'string') {
             input = {
                 command,
                 id: randomString(),
-                continueOnError: this.continueOnError,
+                continueOnError: this.config.continueOnError || false,
             }
         } else {
-            input = command
+            input = {
+                id: randomString(),
+                continueOnError: this.config.continueOnError || false,
+                ...command,
+            }
         }
 
         this.commands.push(input)
@@ -158,6 +95,16 @@ export class CommandChain {
     reset(): this {
         this.commands = []
         return this
+    }
+
+    preHandler(_previousResult: CommandChainResult | null): boolean {
+        return true
+    }
+
+    postHandler(result: CommandChainResult): CommandChainResult {
+        const { success, message } = checkSuccess(result)
+        result.result = { success, message }
+        return result
     }
 
     /**
@@ -170,14 +117,15 @@ export class CommandChain {
 
         for (const command of this.commands) {
             const cmd = command.command
+            const preHandler = command.pre || this.preHandler.bind(this)
 
-            if (command.if && !command.if(lastResult)) {
-                trace(`Command Skipped${this.dryRun ? ' [DRYRUN]' : ''}: ${commandAbbreviator(cmd)}`)
+            if (!preHandler(lastResult)) {
+                this.trace(`Command Skipped${this.config.dryRun ? ' [DRYRUN]' : ''}: ${commandAbbreviator(cmd)}`)
                 continue
             }
 
-            const [out, err, stat] = this.exec(cmd, this.workingDirectory)
-            trace(`Command Run${this.dryRun ? ' [DRYRUN]' : ''}: ${commandAbbreviator(cmd)} => ${stat}`)
+            const [out, err, stat] = this.exec(cmd, this.config.workingDirectory, lastResult, command.pipe)
+            this.trace(`Command Run${this.config.dryRun ? ' [DRYRUN]' : ''}: ${commandAbbreviator(cmd)} => ${stat}`)
             lastResult = {
                 id: command.id,
                 command: cmd,
@@ -190,23 +138,23 @@ export class CommandChain {
                 },
             }
 
-            const success = command.success || checkSuccess
-            lastResult.result = success(lastResult)
+            const postHandler = command.post || this.postHandler.bind(this)
+            lastResult = postHandler(lastResult)
 
             this.results.push(lastResult)
             if (!lastResult.result.success) {
-                trace(`Command failed with: ${lastResult.result.message}`)
+                this.trace(`Command failed with: ${lastResult.result.message}`)
                 if (!command.continueOnError) {
                     break
                 }
             }
         }
 
-        if (this.dryRunResultsFile && !this.dryRun) {
-            if (this.save(this.dryRunResultsFile, true)) {
-                trace(`Saved canned results to file: ${this.dryRunResultsFile}`)
+        if (this.config.dryRunResultsFile && !this.config.dryRun) {
+            if (this.save(this.config.dryRunResultsFile, true)) {
+                this.trace(`Saved canned results to file: ${this.config.dryRunResultsFile}`)
             } else {
-                trace(`Unable to save canned results to file: ${this.dryRunResultsFile}`)
+                this.trace(`Unable to save canned results to file: ${this.config.dryRunResultsFile}`)
             }
         }
 
@@ -289,7 +237,7 @@ export class CommandChain {
 
             for (const r of this.results) {
                 if (r.command in commands) {
-                    trace(`Command already exists in file, overwriting: ${r.command}`)
+                    this.trace(`Command already exists in file, overwriting: ${r.command}`)
                 }
 
                 commands[r.command] = r
@@ -300,7 +248,7 @@ export class CommandChain {
             return true
         } catch (error) {
             if (isNativeError(error)) {
-                trace(`Error saving commands to file: ${error.message}`)
+                this.trace(`Error saving commands to file: ${error.message}`)
             }
             return false
         }
@@ -313,9 +261,9 @@ export class CommandChain {
      * @param workingDirectory - The working directory in which to execute the command.
      * @returns An array containing the stdout, stderr, and status code of the command execution.
      */
-    private exec(cmd: string, workingDirectory: string): [string, string, number] {
+    private exec(cmd: string, workingDirectory: string, lastResult: CommandChainResult | null, pipe?: PipeType): [string, string, number] {
         try {
-            if (this.dryRun) {
+            if (this.config.dryRun) {
                 let out = '',
                     err = '',
                     stat = 0
@@ -326,7 +274,18 @@ export class CommandChain {
                 }
                 return [out, err, stat]
             } else {
-                const result = spawnSync(cmd, { shell: true, cwd: workingDirectory })
+                let input = undefined
+                if (lastResult && pipe) {
+                    if (pipe === 'stdout') {
+                        input = lastResult.out
+                    } else if (pipe === 'stderr') {
+                        input = lastResult.err
+                    } else if (pipe === 'both') {
+                        input = lastResult.out + lastResult.err
+                    }
+                }
+
+                const result = spawnSync(cmd, { shell: true, cwd: workingDirectory, input })
                 return [result.stdout.toString(), result.stderr.toString(), result.status ?? 0]
             }
         } catch (err) {
