@@ -1,6 +1,6 @@
 {
   "name": "@kshehadeh/cmdq",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "A tool for chaining shell commands",
   "type": "module",
   "exports": {
@@ -13,7 +13,9 @@
   "scripts": {
     "test": "jest",
     "build": "rollup -c",
-    "build:watch": "rollup -c -w"
+    "build:watch": "rollup -c -w",
+    "increment": "npm version patch --no-git-tag-version",
+    "deploy": "npm test && npm run build && npm publish --access public"
   },
   "keywords": [
     "shell"
@@ -41,8 +43,5 @@
     "tslib": "^2.6.3",
     "typescript": "^5.5.4"
   },
-  "module": "index.ts",
-  "dependencies": {
-    "getopts": "^2.3.0"
-  }
+  "module": "index.ts"
 }
