@@ -1,4 +1,4 @@
-import { CommandChain } from "../src";
+import { q } from "../src";
 import { getopts } from "../src";
 
 const options = getopts(process.argv, {
@@ -6,7 +6,7 @@ const options = getopts(process.argv, {
     alias: { d: 'directory' },
 })
 
-console.log(new CommandChain(options.directory)
+console.log(q(options.directory)
     .add('npm pkg get version')
     .run()
     .firstOut()

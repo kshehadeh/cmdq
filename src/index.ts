@@ -1,12 +1,12 @@
 export { 
-    exec, 
-    execWithOutput, 
-    CommandChain 
-} from "./command-chain";
+    q,
+    r, 
+    CommandQueue
+} from "./command-queue";
 
 export { 
-    type CommandChainConfig, 
-    type CommandChainResult, 
+    type CommandQueueConfig, 
+    type CommandQueueResult, 
     type CmdOptions, 
     type CommandInput 
 } from "./types";

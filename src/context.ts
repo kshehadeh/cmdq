@@ -1,6 +1,6 @@
-import { CommandChainConfig } from "./types";
+import { CommandQueueConfig } from "./types";
 
-let globalConfig: CommandChainConfig = {
+let globalConfig: CommandQueueConfig = {
     workingDirectory: ".",
     enableTrace: false,
     continueOnError: false,
@@ -8,7 +8,7 @@ let globalConfig: CommandChainConfig = {
     dryRunResultsFile: undefined,
 }
 
-export function setGlobalConfig(config: CommandChainConfig) {
+export function setGlobalConfig(config: CommandQueueConfig) {
     globalConfig = config
 }
 

@@ -1,24 +1,26 @@
 import { spawnSync } from 'child_process'
 import { isNativeError } from 'util/types'
 import fs from 'fs'
-import { CommandInput, CommandChainResult, CommandChainConfig, PipeType, CmdOptions } from './types'
-import { isConfig, randomString, commandAbbreviator, checkSuccess } from './util'
+import { CommandInput, CommandQueueResult, CommandQueueConfig, PipeType, CmdOptions, isConfig } from './types'
+import { randomString } from './util'
 import { getGlobalConfig } from './context'
 
+const SHOW_COMMAND_LENGTH = 20
+
 /**
- * Represents a chain of commands to be executed.
+ * Represents a queue of commands to be executed.
  */
-export class CommandChain {
+export class CommandQueue {
     commands: CommandInput[] = []
-    config: CommandChainConfig
-    results: CommandChainResult[] = []
-    _cannedResults: Record<string, CommandChainResult> = {}
+    config: CommandQueueConfig
+    results: CommandQueueResult[] = []
+    _cannedResults: Record<string, CommandQueueResult> = {}
 
     /**
      * Creates a new instance of CommandChain.
      * @param workingDirectory The working directory for the commands.
      */
-    constructor(configOrCwd?: CommandChainConfig | string) {
+    constructor(configOrCwd?: CommandQueueConfig | string) {
         if (!configOrCwd) {
             this.config = getGlobalConfig()
         } else if (isConfig(configOrCwd)) {
@@ -33,7 +35,7 @@ export class CommandChain {
         if (this.config.dryRun && this.config.dryRunResultsFile) {
             if (fs.existsSync(this.config.dryRunResultsFile)) {
                 const raw = fs.readFileSync(this.config.dryRunResultsFile, 'utf-8')
-                this._cannedResults = JSON.parse(raw)                
+                this._cannedResults = JSON.parse(raw)
             }
         }
     }
@@ -43,13 +45,13 @@ export class CommandChain {
             console.log(message, ...optionalParams)
         }
     }
-    
+
     /**
      * Get a command result by id or index.
      * @param idOrIndex
      * @returns
      */
-    get(idOrIndex: string | number): CommandChainResult | undefined {
+    get(idOrIndex: string | number): CommandQueueResult | undefined {
         if (typeof idOrIndex === 'string') {
             return this.results.find((r) => r.id === idOrIndex)
         } else {
@@ -58,37 +60,38 @@ export class CommandChain {
     }
 
     /**
-     * Executes a single command and returns the result.
-     * @param command The command to execute.
-     * @param workingDirectory The working directory for the command.
-     * @returns The result of the command execution.
-     */
-    static cmd(command: string, workingDirectory: string): CommandChainResult | undefined {
-        return new CommandChain(workingDirectory).add(command).run().first()
-    }
-
-    /**
-     * Adds a command to the command chain.
+     * Adds a command to the command queue that pipes the output of the previous command to the input of the current command.
      * @param command The command to add.
      * @returns The updated CommandChain instance.
      */
-    add(command: string | CmdOptions): this {
-        let input: CommandInput
-        if (typeof command === 'string') {
-            input = {
-                command,
-                id: randomString(),
-                continueOnError: this.config.continueOnError || false,
-            }
-        } else {
-            input = {
-                id: randomString(),
-                continueOnError: this.config.continueOnError || false,
-                ...command,
-            }
-        }
+    pipe(command: string, options?: CmdOptions): this {
+        return this.add(command, { pipe: 'stdout', ...options })
+    }
 
+    /**
+     * Adds a command to the command queue. Alias for 'add'.
+     * @param command 
+     * @param options 
+     * @returns 
+     */
+    cmd(command: string, options?: CmdOptions): this {
+        return this.add(command, options)
+    }
+
+    /**
+     * Adds a command to the command queue.
+     * @param command The command to add.
+     * @returns The updated CommandChain instance.
+     */
+    add(command: string, options?: CmdOptions): this {
+        let input: CommandInput = {
+            continueOnError: this.config.continueOnError || false,
+            id: randomString(),
+            command,
+            ...options,
+        }
         this.commands.push(input)
+
         return this
     }
 
@@ -97,35 +100,41 @@ export class CommandChain {
         return this
     }
 
-    preHandler(_previousResult: CommandChainResult | null): boolean {
+    preHandler(_previousResult: CommandQueueResult | null): boolean {
         return true
     }
 
-    postHandler(result: CommandChainResult): CommandChainResult {
-        const { success, message } = checkSuccess(result)
-        result.result = { success, message }
+    postHandler(result: CommandQueueResult): CommandQueueResult {
+        result.result = {
+            success: !(result.stat !== 0 && result.err),
+            message: result.err,
+        }
         return result
     }
 
+    private commandAbbreviator(cmd: string) {
+        return cmd.length > SHOW_COMMAND_LENGTH ? cmd.slice(0, SHOW_COMMAND_LENGTH) + '...' : cmd
+    }
+    
     /**
-     * Runs all the commands in the command chain.
+     * Runs all the commands in the command queue.
      * @returns An array of CommandChainResult objects representing the results of each command.
      */
-    run(): CommandChain {
+    run(): CommandQueue {
         this.results = []
-        let lastResult: CommandChainResult | null = null
+        let lastResult: CommandQueueResult | null = null
 
         for (const command of this.commands) {
             const cmd = command.command
-            const preHandler = command.pre || this.preHandler.bind(this)
 
-            if (!preHandler(lastResult)) {
-                this.trace(`Command Skipped${this.config.dryRun ? ' [DRYRUN]' : ''}: ${commandAbbreviator(cmd)}`)
+            const cont = this.preHandler(lastResult)
+            if (!cont || (command.pre && !command.pre(lastResult))) {
+                this.trace(`Command Skipped${this.config.dryRun ? ' [DRYRUN]' : ''}: ${this.commandAbbreviator(cmd)}`)
                 continue
             }
 
             const [out, err, stat] = this.exec(cmd, this.config.workingDirectory, lastResult, command.pipe)
-            this.trace(`Command Run${this.config.dryRun ? ' [DRYRUN]' : ''}: ${commandAbbreviator(cmd)} => ${stat}`)
+            this.trace(`Command Run${this.config.dryRun ? ' [DRYRUN]' : ''}: ${this.commandAbbreviator(cmd)} => ${stat}`)
             lastResult = {
                 id: command.id,
                 command: cmd,
@@ -137,9 +146,11 @@ export class CommandChain {
                     message: '',
                 },
             }
-
-            const postHandler = command.post || this.postHandler.bind(this)
-            lastResult = postHandler(lastResult)
+            
+            lastResult = this.postHandler(lastResult)
+            if (command.post) {
+                lastResult = command.post(lastResult)
+            }            
 
             this.results.push(lastResult)
             if (!lastResult.result.success) {
@@ -181,11 +192,14 @@ export class CommandChain {
      * @returns A flattened string of all the error messages.
      */
     flattenErrors(): string {
-        return this.results.map((result) => result.result.message).join('\n')
+        return this.results
+            .filter(r => !r.result.success && r.result.message)
+            .map((result) => result.result.message.trim()
+        ).join('\n')
     }
 
     /**
-     * Checks if all the commands in the command chain were successful.
+     * Checks if all the commands in the command queue were successful.
      * @returns True if all commands were successful, false otherwise.
      */
     success(): boolean {
@@ -193,31 +207,47 @@ export class CommandChain {
     }
 
     /**
-     * Checks if there are any commands in the command chain that failed.
+     * Checks if there are any commands in the command queue that failed.
      * @returns True if there are failed commands, false otherwise.
      */
     hasErrors(): boolean {
         return this.results.some((result) => !result.result.success)
     }
 
-    first(): CommandChainResult | undefined {
+    /**
+     * Returns the first command result in the chain.
+     * @returns 
+     */
+    first(): CommandQueueResult | undefined {
         return this.results.at(0)
     }
 
-    last(): CommandChainResult | undefined {
+    /**
+     * Returns the last command result in the chain.
+     * @returns 
+     */
+    last(): CommandQueueResult | undefined {
         return this.results.at(-1)
     }
 
+    /**
+     * Returns the first command result output in the chain.
+     * @returns 
+     */
     firstOut(): string | undefined {
         return this.first()?.out.trim()
     }
 
+    /**
+     * Returns the last command result output in the chain.
+     * @returns 
+     */
     lastOut(): string | undefined {
         return this.last()?.out.trim()
     }
 
     /**
-     * Save the command chain to a file to play back another time.
+     * Save the command queue to a file to play back another time.
      * @param path The path to the file.
      * @param append Whether to append to an existing file or overwrite it.
      * @returns True if the commands were successfully saved, false otherwise.
@@ -225,7 +255,7 @@ export class CommandChain {
     save(path: string, append: boolean): boolean {
         try {
             // Save the results to a file
-            let commands = {} as Record<string, CommandChainResult>
+            let commands = {} as Record<string, CommandQueueResult>
             if (append) {
                 // check if the file exists
                 if (fs.existsSync(path)) {
@@ -236,10 +266,6 @@ export class CommandChain {
             }
 
             for (const r of this.results) {
-                if (r.command in commands) {
-                    this.trace(`Command already exists in file, overwriting: ${r.command}`)
-                }
-
                 commands[r.command] = r
             }
 
@@ -261,7 +287,7 @@ export class CommandChain {
      * @param workingDirectory - The working directory in which to execute the command.
      * @returns An array containing the stdout, stderr, and status code of the command execution.
      */
-    private exec(cmd: string, workingDirectory: string, lastResult: CommandChainResult | null, pipe?: PipeType): [string, string, number] {
+    private exec(cmd: string, workingDirectory: string, lastResult: CommandQueueResult | null, pipe?: PipeType): [string, string, number] {
         try {
             if (this.config.dryRun) {
                 let out = '',
@@ -285,7 +311,7 @@ export class CommandChain {
                     }
                 }
 
-                const result = spawnSync(cmd, { shell: true, cwd: workingDirectory, input })
+                const result = spawnSync(cmd, { shell: true, cwd: workingDirectory, input: input ? Buffer.from(input) : undefined })
                 return [result.stdout.toString(), result.stderr.toString(), result.status ?? 0]
             }
         } catch (err) {
@@ -298,10 +324,22 @@ export class CommandChain {
     }
 }
 
-export function exec(cmd: string, workingDirectory: string): CommandChainResult | undefined {
-    return new CommandChain(workingDirectory).add(cmd).run().first()
+/**
+ * Creates a new instance of a CommandChain
+ * @param config 
+ * @returns 
+ */
+export function q(config?: CommandQueueConfig | string): CommandQueue {
+    return new CommandQueue(config)
 }
 
-export function execWithOutput(cmd: string, workingDirectory: string): string | undefined  {
-    return new CommandChain(workingDirectory).add(cmd).run().firstOut()
+/**
+ * Executes a single command and returns the result.
+ * @param cmd The command to execute.
+ * @param cmdOptions The command options.
+ * @param qOptions The command queue options.
+ * @returns 
+ */
+export function r(cmd: string, cmdOptions?: CommandInput, qOptions?: CommandQueueConfig): CommandQueueResult | undefined {
+    return new CommandQueue(qOptions).add(cmd, cmdOptions).run().first()
 }

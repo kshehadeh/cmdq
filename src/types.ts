@@ -5,12 +5,12 @@ export interface CommandInput {
     id: string
     continueOnError?: boolean
     pipe?: PipeType
-    pre?: (result: CommandChainResult | null) => boolean
-    post?: (result: CommandChainResult) => CommandChainResult
+    pre?: (result: CommandQueueResult | null) => boolean
+    post?: (result: CommandQueueResult) => CommandQueueResult
 }
 
 
-export interface CommandChainResult {
+export interface CommandQueueResult {
     id: string
     command: string
     out: string
@@ -22,7 +22,7 @@ export interface CommandChainResult {
     }
 }
 
-export interface CommandChainConfig {
+export interface CommandQueueConfig {
     workingDirectory: string
     enableTrace?: boolean    
     continueOnError?: boolean
@@ -30,4 +30,8 @@ export interface CommandChainConfig {
     dryRunResultsFile?: string
 } 
 
-export type CmdOptions = Partial<Omit<CommandInput, 'command'>>
+export const isConfig = (configOrCwd: CommandQueueConfig | string): configOrCwd is CommandQueueConfig => {
+    return (configOrCwd as CommandQueueConfig).workingDirectory !== undefined
+}
+
+export type CmdOptions = Partial<Omit<CommandInput, 'command' | 'id'>>

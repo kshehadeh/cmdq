@@ -1,6 +1,6 @@
 {
-  "name": "cmdq",
-  "version": "0.0.1",
+  "name": "@kshehadeh/cmdq",
+  "version": "0.0.2",
   "description": "A tool for chaining shell commands",
   "type": "module",
   "exports": {
@@ -17,6 +17,9 @@
   },
   "keywords": [
     "shell"
+  ],
+  "files": [
+    "dist"
   ],
   "publishConfig": {
     "access": "public",
