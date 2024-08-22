@@ -34,4 +34,4 @@ export const isConfig = (configOrCwd: CommandQueueConfig | string): configOrCwd 
     return (configOrCwd as CommandQueueConfig).workingDirectory !== undefined
 }
 
-export type CmdOptions = Partial<Omit<CommandInput, 'command' | 'id'>>
+export type CmdOptions = Partial<Omit<CommandInput, 'command'>>
