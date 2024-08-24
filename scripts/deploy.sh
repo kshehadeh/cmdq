@@ -7,7 +7,7 @@ if [ -n "$(git status --porcelain)" ]; then
 fi
 
 # Make sure we're on the master branch
-if [ "$(git rev-parse --abbrev-ref HEAD)" != "master" ]; then
+if [ "$(git rev-parse --abbrev-ref HEAD)" != "main" ]; then
   echo "Not on master branch. Please switch to the master branch before deploying."
   exit 1
 fi
