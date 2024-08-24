@@ -168,8 +168,15 @@ describe('pipes', () => {
             }
         }).run();
         const result = commandQueue.last();
-        expect(result?.out.trim()).toEqual('Hello');
+        expect(result?.out.trim()).toEqual('');
     });
+
+    it('should work with multiple pipes', () => {
+        const commandQueue = new CommandQueue('.');
+        commandQueue.add('echo "Hello"').pipe('grep "Hello"').pipe('tr -d "o"').run();
+        const result = commandQueue.last();
+        expect(result?.out.trim()).toBe('Hell');
+    })
 })
 
 describe('errors', () => {
@@ -222,6 +229,8 @@ describe('save', () => {
             'echo "Hello"': {
                 id: expect.any(String),
                 command: 'echo "Hello"',
+                piped: 'none',
+                skipped: false,
                 out: 'Hello\n',
                 err: '',
                 stat: 0,
@@ -233,6 +242,8 @@ describe('save', () => {
             'echo "World"': {
                 id: expect.any(String),
                 command: 'echo "World"',
+                piped: 'none',
+                skipped: false,
                 out: 'World\n',
                 err: '',
                 stat: 0,
@@ -250,6 +261,8 @@ describe('save', () => {
             'echo "Existing Command"': {
                 id: 'existing-command-id',
                 command: 'echo "Existing Command"',
+                skipped: false,
+                piped: 'none',
                 out: '',
                 err: '',
                 stat: 0,
@@ -275,6 +288,8 @@ describe('save', () => {
             'echo "Hello"': {
                 id: expect.any(String),
                 command: 'echo "Hello"',
+                skipped: false,
+                piped: 'none',
                 out: 'Hello\n',
                 err: '',
                 stat: 0,
@@ -286,6 +301,8 @@ describe('save', () => {
             'echo "World"': {
                 id: expect.any(String),
                 command: 'echo "World"',
+                skipped: false,
+                piped: 'none',
                 out: 'World\n',
                 err: '',
                 stat: 0,
@@ -303,6 +320,8 @@ describe('save', () => {
             'echo "Existing Command"': {
                 id: 'existing-command-id',
                 command: 'echo "Existing Command"',
+                skipped: false,
+                piped: 'none',
                 out: '',
                 err: '',
                 stat: 0,
@@ -328,6 +347,8 @@ describe('save', () => {
                 id: expect.any(String),
                 command: 'echo "Hello"',
                 out: 'Hello\n',
+                skipped: false,
+                piped: 'none',
                 err: '',
                 stat: 0,
                 result: {
@@ -339,6 +360,8 @@ describe('save', () => {
                 id: expect.any(String),
                 command: 'echo "World"',
                 out: 'World\n',
+                skipped: false,
+                piped: 'none',
                 err: '',
                 stat: 0,
                 result: {

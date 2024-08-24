@@ -5,7 +5,7 @@ export interface CommandInput {
     id: string
     continueOnError?: boolean
     pipe?: PipeType
-    pre?: (result: CommandQueueResult | null) => boolean
+    pre?: (result?: CommandQueueResult) => boolean
     post?: (result: CommandQueueResult) => CommandQueueResult
 }
 
@@ -13,6 +13,8 @@ export interface CommandInput {
 export interface CommandQueueResult {
     id: string
     command: string
+    piped: PipeType
+    skipped: boolean
     out: string
     err: string
     stat: number
