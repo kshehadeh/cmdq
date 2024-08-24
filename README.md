@@ -93,6 +93,7 @@ q()
   .pipe('jq .name')
   .pipe('tr -d \'"\'')
   .run();
+```
 
 ## API
 
