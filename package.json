@@ -19,7 +19,7 @@
     "build": "rollup -c",
     "build:watch": "rollup -c -w",
     "increment": "npm version patch --no-git-tag-version",
-    "deploy": "npm test && npm run build && npm publish --access public"
+    "deploy": "./scripts/deploy.sh"
   },
   "keywords": [
     "shell",

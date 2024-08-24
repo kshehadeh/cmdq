@@ -24,6 +24,6 @@ npm run build
 npm publish --access public
 
 # Commit the version bump
-git add package.json
+git add .
 git commit -m "Bump version"
 git push
