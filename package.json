@@ -3,6 +3,10 @@
   "version": "0.0.4",
   "description": "A tool for chaining shell commands",
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kshehadeh/cmdq"
+  },  
   "exports": {
     ".": {
       "import": "./dist/bundle.esm.js",
@@ -18,7 +22,16 @@
     "deploy": "npm test && npm run build && npm publish --access public"
   },
   "keywords": [
-    "shell"
+    "shell",
+    "command",
+    "cmdq",
+    "command queue",
+    "shell command",
+    "shell commands",
+    "shell script",
+    "shell scripts",
+    "scripting",
+    "bash"
   ],
   "files": [
     "dist"
