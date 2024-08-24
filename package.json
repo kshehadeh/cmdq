@@ -1,12 +1,12 @@
 {
   "name": "@kshehadeh/cmdq",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "description": "A tool for chaining shell commands",
   "type": "module",
   "repository": {
     "type": "git",
     "url": "https://github.com/kshehadeh/cmdq"
-  },  
+  },
   "exports": {
     ".": {
       "import": "./dist/bundle.esm.js",
