@@ -27,10 +27,3 @@ console.log(q(options.directory)
     .run()
     .lastOut()
 )
-
-
-// const result = spawnSync('grep package.json', { cwd: options.directory, shell: true, input: 'test\ntest2\npackage\n' })
-// const input = spawnSync('ls', { cwd: options.directory, shell: true })
-// console.log(input.stdout.toString())
-// const result = spawnSync('ls | grep package.json', { cwd: options.directory, shell: true, input: input.stdout })
-// console.log(result.stdout.toString())

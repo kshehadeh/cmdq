@@ -81,6 +81,19 @@ q()
 // Output: 2
 ```
 
+Note: If you a command is to be piped to but the target command is skipped, the previous command will not be run.
+
+Note: You can chain multiple commands to be piped to by calling `pipe` multiple times.  For example:
+
+```typescript
+import { q } from 'cmdq';
+
+q()
+  .cmd('echo "{ \"name\": \"John\" }"')
+  .pipe('jq .name')
+  .pipe('tr -d \'"\'')
+  .run();
+
 ## API
 
 ### `q([config])`

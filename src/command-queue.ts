@@ -115,50 +115,34 @@ export class CommandQueue {
     private commandAbbreviator(cmd: string) {
         return cmd.length > SHOW_COMMAND_LENGTH ? cmd.slice(0, SHOW_COMMAND_LENGTH) + '...' : cmd
     }
-    
+
     /**
      * Runs all the commands in the command queue.
      * @returns An array of CommandChainResult objects representing the results of each command.
      */
     run(): CommandQueue {
         this.results = []
-        let lastResult: CommandQueueResult | null = null
+        let lastResult: CommandQueueResult | undefined = undefined
 
-        for (const command of this.commands) {
+        for (let i = 0; i < this.commands.length; i++) {
+            const command = this.commands[i]
+            const nextCommand = this.commands[i + 1]
             const cmd = command.command
 
-            const cont = this.preHandler(lastResult)
-            if (!cont || (command.pre && !command.pre(lastResult))) {
-                this.trace(`Command Skipped${this.config.dryRun ? ' [DRYRUN]' : ''}: ${this.commandAbbreviator(cmd)}`)
-                continue
+            if (this.shouldSkipCommand(command, lastResult)) {
+                lastResult = this.handleSkippedCommand(command, cmd)
+            } else if (this.shouldPipeCommand(nextCommand)) {
+                lastResult = this.handlePipedCommand(lastResult, command, cmd, nextCommand)
+            } else {
+                lastResult = this.handleExecCommand(lastResult, command, cmd, i)
             }
 
-            const [out, err, stat] = this.exec(cmd, this.config.workingDirectory, lastResult, command.pipe)
-            this.trace(`Command Run${this.config.dryRun ? ' [DRYRUN]' : ''}: ${this.commandAbbreviator(cmd)} => ${stat}`)
-            lastResult = {
-                id: command.id,
-                command: cmd,
-                out,
-                err,
-                stat,
-                result: {
-                    success: false,
-                    message: '',
-                },
-            }
-            
-            lastResult = this.postHandler(lastResult)
-            if (command.post) {
-                lastResult = command.post(lastResult)
-            }            
-
-            this.results.push(lastResult)
-            if (!lastResult.result.success) {
-                this.trace(`Command failed with: ${lastResult.result.message}`)
+            if (!lastResult?.result.success) {
+                this.trace(`Command failed with: ${lastResult?.result.message}`)
                 if (!command.continueOnError) {
                     break
                 }
-            }
+            }    
         }
 
         if (this.config.dryRunResultsFile && !this.config.dryRun) {
@@ -172,6 +156,113 @@ export class CommandQueue {
         this.reset()
 
         return this
+    }
+
+    private shouldPipeCommand(nextCommand: CommandInput | undefined) {
+        return nextCommand && nextCommand.pipe && nextCommand.pipe !== 'none'
+    }
+
+    private shouldSkipCommand(command: CommandInput, lastResult: CommandQueueResult | undefined) {
+        return !this.preHandler(lastResult ?? null) ||
+        (command.pre && !command.pre(lastResult))
+    }
+
+    private handleExecCommand(lastResult: CommandQueueResult | undefined, command: CommandInput, cmd: string, currentIndex: number) {
+
+        // Construct pipe chain by walking the command queue backwards and add the commands
+        //  that are piped to the current command - stop when you reach a command that is not piped.
+        let pipeChain = cmd
+        for (let j = currentIndex - 1; j >= 0; j--) {
+            const prevResult = this.results[j]
+            if (prevResult.piped !== 'none') {
+                switch (prevResult.piped) {
+                    case 'stdout':
+                        pipeChain = prevResult.command + ' | ' + pipeChain
+                        break
+                    case 'stderr':
+                        pipeChain = prevResult.command + ' 2>&1 1>/dev/null | ' + pipeChain
+                        break
+                    case 'both':
+                        pipeChain = prevResult.command + ' 2>&1 | ' + pipeChain
+                        break
+                    default:
+                        throw new Error('Invalid pipe type')
+                }
+            } else {
+                break
+            }
+        }
+
+        const [out, err, stat] = this.exec(pipeChain, this.config.workingDirectory, lastResult, command.pipe)
+        this.trace(`Command Run${this.config.dryRun ? ' [DRYRUN]' : ''}: ${this.commandAbbreviator(cmd)} => ${stat}`)
+        let newLastResult: CommandQueueResult = {
+            id: command.id,
+            command: pipeChain,
+            skipped: false,
+            piped: 'none',
+            out,
+            err,
+            stat,
+            result: {
+                success: false,
+                message: '',
+            },
+        }
+
+        if (!newLastResult) {
+            // This should never happen but there might be an issue with 
+            //  typescript where it doesn't recognize that lastResult is
+            //  defined at this point.
+            throw new Error('Command result is undefined')
+        }
+
+        newLastResult = this.postHandler(newLastResult)
+        if (command.post) {
+            newLastResult = command.post(newLastResult)
+        }
+
+        this.results.push(newLastResult)
+
+        return newLastResult
+    }
+
+    private handlePipedCommand(lastResult: CommandQueueResult | undefined, command: CommandInput, cmd: string, nextCommand: CommandInput) {
+        const newLastResult: CommandQueueResult = {
+            id: command.id,
+            command: cmd,
+            piped: nextCommand.pipe || 'none',
+            skipped: false,
+            out: '',
+            err: '',
+            stat: 0,
+            result: {
+                success: true,
+                message: 'Piped to following command',
+            },
+        }
+        this.trace(`Command Piped${this.config.dryRun ? ' [DRYRUN]' : ''}: ${this.commandAbbreviator(cmd)}`)
+        this.results.push(newLastResult)
+        return newLastResult
+    }
+
+    private handleSkippedCommand(command: CommandInput, cmd: string) {
+
+        const newLastResult: CommandQueueResult = {
+            id: command.id,
+            command: cmd,
+            skipped: true,
+            piped: 'none',
+            out: '',
+            err: '',
+            stat: 0,
+            result: {
+                success: false,
+                message: 'Command skipped',
+            },
+        }
+        this.trace(`Command Skipped${this.config.dryRun ? ' [DRYRUN]' : ''}: ${this.commandAbbreviator(cmd)}`)
+        this.results.push(newLastResult)
+        return newLastResult
     }
 
     /**
@@ -195,7 +286,7 @@ export class CommandQueue {
         return this.results
             .filter(r => !r.result.success && r.result.message)
             .map((result) => result.result.message.trim()
-        ).join('\n')
+            ).join('\n')
     }
 
     /**
@@ -215,11 +306,16 @@ export class CommandQueue {
     }
 
     /**
-     * Returns the first command result in the chain.
+     * Returns the first unskipped command result in the chain.
      * @returns 
      */
     first(): CommandQueueResult | undefined {
-        return this.results.at(0)
+        // Find the first unskipped command
+        for (let i = 0; i < this.results.length; i++) {
+            if (!this.results[i].skipped) {
+                return this.results[i]
+            }
+        }
     }
 
     /**
@@ -227,7 +323,13 @@ export class CommandQueue {
      * @returns 
      */
     last(): CommandQueueResult | undefined {
-        return this.results.at(-1)
+        // Find the last unskipped command
+        for (let i = this.results.length - 1; i >= 0; i--) {
+            if (!this.results[i].skipped) {
+                return this.results[i]
+            }
+        }
+        return undefined
     }
 
     /**
@@ -287,7 +389,7 @@ export class CommandQueue {
      * @param workingDirectory - The working directory in which to execute the command.
      * @returns An array containing the stdout, stderr, and status code of the command execution.
      */
-    private exec(cmd: string, workingDirectory: string, lastResult: CommandQueueResult | null, pipe?: PipeType): [string, string, number] {
+    private exec(cmd: string, workingDirectory: string, lastResult?: CommandQueueResult, pipe?: PipeType): [string, string, number] {
         try {
             if (this.config.dryRun) {
                 let out = '',
@@ -302,6 +404,7 @@ export class CommandQueue {
             } else {
                 let input = undefined
                 if (lastResult && pipe) {
+                    // If we're piping the output of the previous command to the input of the current command then...
                     if (pipe === 'stdout') {
                         input = lastResult.out
                     } else if (pipe === 'stderr') {
