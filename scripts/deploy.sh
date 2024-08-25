@@ -61,6 +61,6 @@ git remote -v
 
 # # Commit the version bump
 # echo "🎯 Committing version change..."
-# git add .
-# git commit -m "Bump version"
-# git push
+git add .
+git commit -m "Bump version"
+git push
