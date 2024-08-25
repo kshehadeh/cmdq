@@ -43,22 +43,24 @@ if [ $result -ne 0 ]; then
     echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > ~/.npmrc
 fi
 
-# Bump the version
-echo "🎯 Incrementing version..."
-npm run increment
+git remote -v
 
-# Build, and publish
-echo "🎯 Installing packages..."
-npm install
+# # Bump the version
+# echo "🎯 Incrementing version..."
+# npm run increment
 
-echo "🎯 Running build..."
-npm run build
+# # Build, and publish
+# echo "🎯 Installing packages..."
+# npm install
 
-echo "🎯 Publishing to NPM..."
-# npm publish --access public
+# echo "🎯 Running build..."
+# npm run build
 
-# Commit the version bump
-echo "🎯 Committing version change..."
-git add .
-git commit -m "Bump version"
-git push
+# echo "🎯 Publishing to NPM..."
+# # npm publish --access public
+
+# # Commit the version bump
+# echo "🎯 Committing version change..."
+# git add .
+# git commit -m "Bump version"
+# git push
