@@ -57,7 +57,7 @@ echo "🎯 Running build..."
 npm run build
 
 echo "🎯 Publishing to NPM..."
-# npm publish --access public
+npm publish --access public
 
 # Commit the version bump
 echo "🎯 Committing version change..."
