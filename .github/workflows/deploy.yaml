@@ -12,7 +12,11 @@ jobs:
             NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
             GIT_EMAIL: ${{ secrets.GIT_EMAIL }}
             GIT_NAME: ${{ secrets.GIT_NAME }}
-            GIT_COMMIT_TOKEN: ${{ secrets.GIT_COMMIT_TOKEN }}
+            GIT_COMMIT_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+        permissions:
+            contents: write
+
         steps:
             - name: Checkout repository
               uses: actions/checkout@v2
