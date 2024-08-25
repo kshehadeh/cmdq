@@ -5,7 +5,7 @@ CmdQ is a chained command queue for typescript.  It allows for the chaining of c
 ## Installation
 
 ```bash
-npm install cmdq
+npm install @kshehadeh/cmdq
 ```
 
 ## Usage
