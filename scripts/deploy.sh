@@ -16,8 +16,8 @@ if [ -z "$NPM_TOKEN" ]; then
   exit 1
 fi
 
-if [ -z "$GITHUB_TOKEN" ]; then 
-    echo "❌ GITHUB_TOKEN is not set. Please set GITHUB_TOKEN."
+if [ -z "$GIT_COMMIT_TOKEN" ]; then 
+    echo "❌ GIT_COMMIT_TOKEN is not set. Please set GIT_COMMIT_TOKEN."
     exit 1
 fi
 
@@ -32,7 +32,7 @@ if [ -z "$(git config --global user.email)" ]; then
     echo "🎯 Setting github config user"
     git config --global user.email "${GIT_EMAIL}"
     git config --global user.name "${GIT_NAME}"  
-    git remote set-url origin https://x-access-token:$GITHUB_TOKEN@github.com/kshehadeh/cmdq
+    git remote set-url origin https://x-access-token:$GIT_COMMIT_TOKEN@github.com/kshehadeh/cmdq
 fi
 
 # Setup npmrc publish
@@ -55,7 +55,7 @@ echo "🎯 Running build..."
 npm run build
 
 echo "🎯 Publishing to NPM..."
-npm publish --access public
+# npm publish --access public
 
 # Commit the version bump
 echo "🎯 Committing version change..."
