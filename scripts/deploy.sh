@@ -46,21 +46,21 @@ fi
 git remote -v
 
 # # Bump the version
-# echo "🎯 Incrementing version..."
-# npm run increment
+echo "🎯 Incrementing version..."
+npm run increment
 
-# # Build, and publish
-# echo "🎯 Installing packages..."
-# npm install
+# Build, and publish
+echo "🎯 Installing packages..."
+npm install
 
-# echo "🎯 Running build..."
-# npm run build
+echo "🎯 Running build..."
+npm run build
 
-# echo "🎯 Publishing to NPM..."
-# # npm publish --access public
+echo "🎯 Publishing to NPM..."
+# npm publish --access public
 
-# # Commit the version bump
-# echo "🎯 Committing version change..."
+# Commit the version bump
+echo "🎯 Committing version change..."
 git add .
 git commit -m "Bump version"
 git push
