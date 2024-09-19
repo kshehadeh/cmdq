@@ -1,8 +1,8 @@
 {
   "name": "@kshehadeh/cmdq",
-  "version": "0.0.11",
+  "version": "0.0.12",
   "description": "A tool for chaining shell commands",
-  "type": "module",  
+  "type": "module",
   "repository": {
     "type": "git",
     "url": "https://github.com/kshehadeh/cmdq"
