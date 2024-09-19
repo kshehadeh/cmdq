@@ -1,4 +1,4 @@
-import { CommandQueueConfig } from "./types";
+import { CommandQueueConfig } from "./types.js";
 
 let globalConfig: CommandQueueConfig = {
     workingDirectory: ".",

@@ -1,9 +1,9 @@
 import { spawnSync } from 'child_process'
 import { isNativeError } from 'util/types'
 import fs from 'fs'
-import { CommandInput, CommandQueueResult, CommandQueueConfig, PipeType, CmdOptions, isConfig } from './types'
-import { randomString } from './util'
-import { getGlobalConfig } from './context'
+import { CommandInput, CommandQueueResult, CommandQueueConfig, PipeType, CmdOptions, isConfig } from './types.js'
+import { randomString } from './util.js'
+import { getGlobalConfig } from './context.js'
 
 const SHOW_COMMAND_LENGTH = 20
 

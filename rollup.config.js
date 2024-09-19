@@ -6,12 +6,8 @@ export default {
   input: 'src/index.ts',
   output: [
     {
-      file: 'dist/bundle.cjs.js',
-      format: 'cjs',
-      sourcemap: true
-    },
-    {
-      file: 'dist/bundle.esm.js',
+      dir: 'dist',
+      preserveModules: true,
       format: 'esm',
       sourcemap: true
     }
